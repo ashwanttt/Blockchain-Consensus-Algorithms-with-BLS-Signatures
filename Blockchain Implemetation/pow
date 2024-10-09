@@ -1,1 +1,127 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
+/// @title Simplified Proof of Work with Simulated BLS Signatures
+contract ProofOfWorkBLS {
+    struct Block {
+        uint256 index;
+        bytes32 previousHash;
+        uint256 timestamp;
+        string data;
+        uint256 nonce;
+        bytes[] signatures;
+        bytes32 aggregateSignature;
+        bytes32 hash;
+    }
+
+    struct Miner {
+        string name;
+        uint256 hashRate; // Hashes per second
+        address addr;
+        uint256 blocksMined;
+    }
+
+    Block[] public blockchain;
+    Miner[] public miners;
+    uint256 public difficulty = 4; // Number of leading zeros required in hash
+
+    event BlockAdded(uint256 index, bytes32 hash, string minerName);
+    event MinerAdded(string name, uint256 hashRate, address addr);
+
+    constructor() {
+        // Initialize genesis block
+        Block memory genesisBlock = Block({
+            index: 0,
+            previousHash: bytes32(0),
+            timestamp: block.timestamp,
+            data: "Genesis Block",
+            nonce: 0,
+            signatures: new bytes[](0),
+            aggregateSignature: bytes32(0),
+            hash: keccak256(abi.encodePacked(uint256(0), bytes32(0), block.timestamp, "Genesis Block", uint256(0)))
+        });
+        blockchain.push(genesisBlock);
+    }
+
+    function addMiner(string memory _name, uint256 _hashRate) public {
+        miners.push(Miner({
+            name: _name,
+            hashRate: _hashRate,
+            addr: msg.sender,
+            blocksMined: 0
+        }));
+        emit MinerAdded(_name, _hashRate, msg.sender);
+    }
+
+    function simulateSignBlock(uint256 _index, bytes32 _hash) internal pure returns (bytes memory) {
+        // Simulate a BLS signature (placeholder)
+        return abi.encodePacked(uint256(_hash));
+    }
+
+    function mineBlock(uint256 minerIndex) public {
+        require(minerIndex < miners.length, "Miner does not exist");
+
+        Miner storage miner = miners[minerIndex];
+        Block storage lastBlock = blockchain[blockchain.length - 1];
+        uint256 newIndex = lastBlock.index + 1;
+        uint256 startTime = block.timestamp;
+        uint256 nonce = 0;
+        bytes32 newHash;
+
+        while (nonce < 2**32) {
+            newHash = keccak256(abi.encodePacked(newIndex, lastBlock.hash, block.timestamp, "New Block Data", nonce));
+            if (startsWithZeros(newHash, difficulty)) {
+                // Simulate signing
+                bytes memory sig = simulateSignBlock(newIndex, newHash);
+                bytes32 aggregateSig = keccak256(sig);
+
+                // Create new block
+                Block memory newBlock = Block({
+                    index: newIndex,
+                    previousHash: lastBlock.hash,
+                    timestamp: block.timestamp,
+                    data: "New Block Data",
+                    nonce: nonce,
+                    signatures: new bytes[](0),
+                    aggregateSignature: aggregateSig,
+                    hash: newHash
+                });
+
+                newBlock.signatures[0] = sig;
+
+                // Add block to blockchain
+                blockchain.push(newBlock);
+                miner.blocksMined += 1;
+
+                emit BlockAdded(newIndex, newHash, miner.name);
+                return;
+            }
+            nonce += 1;
+        }
+
+        revert("Mining failed: Nonce limit reached");
+    }
+
+    function startsWithZeros(bytes32 _hash, uint256 _zeros) internal pure returns (bool) {
+        for (uint256 i = 0; i < _zeros; i++) {
+            if (_hash[i] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function getBlockchainLength() public view returns (uint256) {
+        return blockchain.length;
+    }
+
+    function getBlock(uint256 _index) public view returns (Block memory) {
+        require(_index < blockchain.length, "Block does not exist");
+        return blockchain[_index];
+    }
+
+    function getMiner(uint256 _index) public view returns (Miner memory) {
+        require(_index < miners.length, "Miner does not exist");
+        return miners[_index];
+    }
+}
