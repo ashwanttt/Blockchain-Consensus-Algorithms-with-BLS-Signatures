@@ -1,0 +1,131 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+/// @title Simplified Proof of Stake with Simulated BLS Signatures
+contract ProofOfStakeBLS {
+    struct Block {
+        uint256 index;
+        bytes32 previousHash;
+        uint256 timestamp;
+        string data;
+        bytes[] signatures;
+        bytes32 aggregateSignature;
+        bytes32 hash;
+    }
+
+    struct Validator {
+        string name;
+        uint256 stake;
+        address addr;
+    }
+
+    Block[] public blockchain;
+    Validator[] public validators;
+    uint256 public totalStake;
+
+    event BlockAdded(uint256 index, bytes32 hash);
+    event ValidatorAdded(string name, uint256 stake, address addr);
+
+    constructor() {
+        // Initialize genesis block
+        Block memory genesisBlock = Block({
+            index: 0,
+            previousHash: bytes32(0),
+            timestamp: block.timestamp,
+            data: "Genesis Block",
+            signatures: new bytes[](0),
+            aggregateSignature: bytes32(0),
+            hash: keccak256(abi.encodePacked(uint256(0), bytes32(0), block.timestamp, "Genesis Block"))
+        });
+        blockchain.push(genesisBlock);
+    }
+
+    function addValidator(string memory _name, uint256 _stake) public {
+        validators.push(Validator({
+            name: _name,
+            stake: _stake,
+            addr: msg.sender
+        }));
+        totalStake += _stake;
+        emit ValidatorAdded(_name, _stake, msg.sender);
+    }
+
+    function selectValidators(uint256 numSignatures) internal view returns (Validator[] memory) {
+        require(validators.length >= numSignatures, "Not enough validators");
+        Validator[] memory selected = new Validator[](numSignatures);
+        uint256 remainingStake = totalStake;
+        for (uint256 i = 0; i < numSignatures; i++) {
+            uint256 rand = uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty, i))) % remainingStake;
+            uint256 cumulativeStake = 0;
+            for (uint256 j = 0; j < validators.length; j++) {
+                cumulativeStake += validators[j].stake;
+                if (rand < cumulativeStake) {
+                    selected[i] = validators[j];
+                    remainingStake -= validators[j].stake;
+                    break;
+                }
+            }
+        }
+        return selected;
+    }
+
+    function simulateSignBlock(uint256 _index, bytes32 _hash) internal pure returns (bytes memory) {
+        // Simulate a BLS signature (placeholder)
+        return abi.encodePacked(uint256(_hash));
+    }
+
+    function runConsensus(uint256 numSignatures) public {
+        require(validators.length >= numSignatures, "Not enough validators to sign the block");
+
+        Validator[] memory selectedValidators = selectValidators(numSignatures);
+        Block memory previousBlock = blockchain[blockchain.length - 1];
+        uint256 newIndex = previousBlock.index + 1;
+        bytes32 newHash = keccak256(abi.encodePacked(newIndex, previousBlock.hash, block.timestamp, "New Block Data"));
+
+        Block memory newBlock = Block({
+            index: newIndex,
+            previousHash: previousBlock.hash,
+            timestamp: block.timestamp,
+            data: "New Block Data",
+            signatures: new bytes[](0),
+            aggregateSignature: bytes32(0),
+            hash: newHash
+        });
+
+        bytes[] memory signatures = new bytes[](numSignatures);
+        bytes32 aggregateSig = bytes32(0);
+
+        for (uint256 i = 0; i < numSignatures; i++) {
+            bytes memory sig = simulateSignBlock(newIndex, newHash);
+            signatures[i] = sig;
+            // Simplified aggregation: XOR of all signatures (placeholder)
+            aggregateSig ^= bytes32(sig);
+        }
+
+        newBlock.signatures = signatures;
+        newBlock.aggregateSignature = aggregateSig;
+
+        // Verify aggregated signature (placeholder)
+        bool valid = verifyAggregateSignature(selectedValidators, newBlock);
+
+        require(valid, "Invalid aggregated signature");
+
+        blockchain.push(newBlock);
+        emit BlockAdded(newIndex, newHash);
+    }
+
+    function verifyAggregateSignature(Validator[] memory _validators, Block memory _block) internal pure returns (bool) {
+        // Placeholder for BLS AggregateVerify
+        // In reality, you would implement or call a BLS verification function
+        return true;
+    }
+
+    function getBlockchainLength() public view returns (uint256) {
+        return blockchain.length;
+    }
+
+    function getBlock(uint256 _index) public view returns (Block memory) {
+        require(_index < blockchain.length, "Block does not exist");
+        return blockchain[_index];
+    }
+}
